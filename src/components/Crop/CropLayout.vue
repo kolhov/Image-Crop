@@ -73,6 +73,7 @@ function onHover(e: MouseEvent) {
 }
 
 function stopHighlightning(e: MouseEvent) {
+  if (!isHighlightningStarted.value) return;
   isHighlightningStarted.value = false;
 
   highlight.value.xEnd = e.offsetX;
@@ -84,7 +85,9 @@ function stopHighlightning(e: MouseEvent) {
   <div
     @mousedown="startHighlightning"
     @mouseup="stopHighlightning"
+    @mouseleave="stopHighlightning"
     @mousemove="onHover"
+    draggable="false"
   >
     <div
       v-if="isHighlighted"
@@ -96,6 +99,7 @@ function stopHighlightning(e: MouseEvent) {
         left,
       }"
     ></div>
+    <slot></slot>
   </div>
 </template>
 
