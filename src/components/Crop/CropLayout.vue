@@ -1,66 +1,92 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import type {
+  HighlightNormalizedBounds,
+  HighlightRawPoints,
+  ImageSize,
+} from "@/lib/types";
+import { computed, ref } from "vue";
 
-interface HighlightPos {
-  xStart?: number;
-  yStart?: number;
-  xEnd?: number;
-  yEnd?: number;
+interface CropLayoutProps {
+  naturalSize?: ImageSize;
 }
 
-const highlight = ref<HighlightPos>({});
+const { naturalSize } = defineProps<CropLayoutProps>();
+const highlightedZone = defineModel<HighlightNormalizedBounds>();
+
+const layout = ref<HTMLElement>();
+const rawHighlight = ref<HighlightRawPoints>({});
 const isHighlightningStarted = ref<boolean>(false);
-const isHighlighted = computed<boolean>(
-  () =>
-    !!highlight.value.xStart && highlightW.value > 4 && highlightH.value > 4,
-);
 
-const top = computed(() => {
-  let size = 0;
-  const { yEnd, yStart } = highlight.value;
-  if (!yStart) return;
+const normalizedHighlight = computed(() => {
+  const coords = {} as HighlightNormalizedBounds;
+  const { xEnd, xStart, yEnd, yStart } = rawHighlight.value;
 
-  if (yEnd && yEnd < yStart) size = yEnd;
-  else size = yStart;
+  if (
+    !layout.value ||
+    yStart == null ||
+    yEnd == null ||
+    xStart == null ||
+    xEnd == null
+  )
+    return coords;
 
-  return `${size}px`;
-});
+  if (yEnd < yStart) {
+    coords.top = yEnd;
+    coords.bottom = yStart;
+  } else {
+    coords.top = yStart;
+    coords.bottom = yEnd;
+  }
 
-const left = computed(() => {
-  let size = 0;
-  const { xEnd, xStart } = highlight.value;
-  if (!xStart) return;
+  if (xEnd < xStart) {
+    coords.left = xEnd;
+    coords.right = xStart;
+  } else {
+    coords.left = xStart;
+    coords.right = xEnd;
+  }
 
-  if (xEnd && xEnd < xStart) size = xEnd;
-  else size = xStart;
-
-  return `${size}px`;
+  const { scrollHeight, scrollWidth } = layout.value;
+  
+  return {
+    top: Math.max(coords.top, 0),
+    bottom: Math.min(coords.bottom, scrollHeight),
+    left: Math.max(coords.left, 0),
+    right: Math.min(coords.right, scrollWidth),
+  };
 });
 
 const highlightW = computed(() => {
   const size =
-    highlight.value?.xEnd &&
-    highlight.value?.xStart &&
-    highlight.value?.xEnd - highlight.value?.xStart;
+    normalizedHighlight.value?.right != null &&
+    normalizedHighlight.value?.left != null &&
+    normalizedHighlight.value?.right - normalizedHighlight.value?.left;
 
   return Math.abs(size || 0);
 });
 
 const highlightH = computed(() => {
   const size =
-    highlight.value?.yEnd &&
-    highlight.value?.yStart &&
-    highlight.value?.yEnd - highlight.value?.yStart;
+    normalizedHighlight.value?.bottom != null &&
+    normalizedHighlight.value?.top != null &&
+    normalizedHighlight.value?.bottom - normalizedHighlight.value?.top;
 
   return Math.abs(size || 0);
 });
 
-function startHighlightning(e: MouseEvent) {
-  highlight.value.xStart = e.offsetX;
-  highlight.value.yStart = e.offsetY;
+const isHighlighted = computed<boolean>(
+  () =>
+    rawHighlight.value.xStart != null &&
+    highlightW.value > 4 &&
+    highlightH.value > 4,
+);
 
-  highlight.value.xEnd = undefined;
-  highlight.value.yEnd = undefined;
+function startHighlightning(e: MouseEvent) {
+  rawHighlight.value.xStart = e.offsetX;
+  rawHighlight.value.yStart = e.offsetY;
+
+  rawHighlight.value.xEnd = undefined;
+  rawHighlight.value.yEnd = undefined;
 
   isHighlightningStarted.value = true;
 }
@@ -68,21 +94,46 @@ function startHighlightning(e: MouseEvent) {
 function onHover(e: MouseEvent) {
   if (!isHighlightningStarted.value) return;
 
-  highlight.value.xEnd = e.offsetX;
-  highlight.value.yEnd = e.offsetY;
+  rawHighlight.value.xEnd = e.offsetX;
+  rawHighlight.value.yEnd = e.offsetY;
 }
 
 function stopHighlightning(e: MouseEvent) {
   if (!isHighlightningStarted.value) return;
   isHighlightningStarted.value = false;
 
-  highlight.value.xEnd = e.offsetX;
-  highlight.value.yEnd = e.offsetY;
+  rawHighlight.value.xEnd = e.offsetX;
+  rawHighlight.value.yEnd = e.offsetY;
+
+  calcCropArea();
+}
+
+function calcCropArea() {
+  const { top, bottom, left, right } = normalizedHighlight.value;
+  if (
+    !layout.value ||
+    top == null ||
+    bottom == null ||
+    left == null ||
+    right == null ||
+    !naturalSize
+  )
+    return;
+
+  const { scrollHeight, scrollWidth } = layout.value;
+
+  highlightedZone.value = {
+    top: Math.floor((top / scrollHeight) * naturalSize?.h),
+    bottom: Math.ceil((bottom / scrollHeight) * naturalSize?.h),
+    left: Math.floor((left / scrollWidth) * naturalSize?.w),
+    right: Math.ceil((right / scrollWidth) * naturalSize?.w),
+  };
 }
 </script>
 
 <template>
   <div
+    ref="layout"
     @mousedown="startHighlightning"
     @mouseup="stopHighlightning"
     @mouseleave="stopHighlightning"
@@ -95,8 +146,8 @@ function stopHighlightning(e: MouseEvent) {
       :style="{
         width: `${highlightW}px`,
         height: `${highlightH}px`,
-        top,
-        left,
+        top: `${normalizedHighlight?.top}px`,
+        left: `${normalizedHighlight?.left}px`,
       }"
     ></div>
     <slot></slot>
