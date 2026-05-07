@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import CropLayout from "./CropLayout.vue";
 import type { HighlightNormalizedBounds, ImageSize } from "@/lib/types";
+import DropZone from "../DropZone/DropZone.vue";
 
 const aspectRatio = ref<string | null>();
 const naturalSize = ref<ImageSize>();
@@ -19,7 +20,7 @@ watch(highlightedZone, (x) => console.log(x));
 <template>
   <div class="crop">
     <div class="crop__window" draggable="false">
-      <div class="crop__preview" draggable="false">
+      <div v-if="false" class="crop__preview" draggable="false">
         <CropLayout :naturalSize v-model="highlightedZone" class="crop__layout">
           <img
             class="crop__img"
@@ -29,10 +30,11 @@ watch(highlightedZone, (x) => console.log(x));
           />
         </CropLayout>
       </div>
+      <DropZone></DropZone>
     </div>
     <div class="crop__buttons">
       <button>Cancel</button>
-      <button>Reset</button>
+      <button>Crop</button>
     </div>
   </div>
 </template>
