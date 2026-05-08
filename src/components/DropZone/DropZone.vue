@@ -5,17 +5,44 @@ import Upload from "../Icons/Upload.vue";
 const isDragOver = ref(false);
 const img = defineModel();
 
-function imageHandler(e: DragEvent) {
+function dropHandler(e: DragEvent) {
   isDragOver.value = false;
-  const files = e.dataTransfer?.files;
-  if (!files) return;
+  if (!e.dataTransfer) return;
 
+  const items = [...e.dataTransfer?.items];
+  const imgItem = items.find((item) => item.type.startsWith("image/"));
+
+  if (!imgItem) return;
+
+  img.value = imgItem.getAsFile();
 }
 
 function dragoverHandler(e: DragEvent) {
-  e.preventDefault();
-  e.stopPropagation();
-  e.dataTransfer && (e.dataTransfer.dropEffect = "copy");
+  if (!e.dataTransfer) return;
+
+  const fileItems = [...e.dataTransfer.items].filter(
+    (item) => item.kind === "file",
+  );
+  if (fileItems.length > 0) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const img = fileItems.find((item) => item.type.startsWith("image/"));
+    if (img) {
+      e.dataTransfer.dropEffect = "copy";
+    } else {
+      e.dataTransfer.dropEffect = "none";
+    }
+  }
+}
+
+function changeImageHandler(ev: Event) {
+  const input = ev.target as HTMLInputElement;
+  if (!input.files) return;
+
+  const image = [...input.files].find((item) => item.type.startsWith("image/"));
+
+  img.value = image;
 }
 </script>
 
@@ -25,7 +52,7 @@ function dragoverHandler(e: DragEvent) {
       for="file-drop"
       class="dropzone"
       :class="{ 'dropzone--active': isDragOver }"
-      @drop.prevent="imageHandler"
+      @drop.prevent="dropHandler"
       @dragenter="isDragOver = true"
       @dragleave="isDragOver = false"
       @dragover="dragoverHandler"
@@ -37,6 +64,7 @@ function dragoverHandler(e: DragEvent) {
         type="file"
         accept="image/*"
         class="dropzone__input"
+        @change="changeImageHandler"
       />
     </label>
   </div>

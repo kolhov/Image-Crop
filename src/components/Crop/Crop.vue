@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import CropLayout from "./CropLayout.vue";
 import type { HighlightNormalizedBounds, ImageSize } from "@/lib/types";
 import DropZone from "../DropZone/DropZone.vue";
 
+const userImage = ref();
 const aspectRatio = ref<string | null>();
 const naturalSize = ref<ImageSize>();
 const highlightedZone = ref<HighlightNormalizedBounds>();
+
+const imageUrl = computed(() => URL.createObjectURL(userImage.value));
 
 function setLayoutAspectRatio(e: Event) {
   const img = e.target as HTMLImageElement;
@@ -14,26 +17,30 @@ function setLayoutAspectRatio(e: Event) {
   naturalSize.value = { h: img.naturalHeight, w: img.naturalWidth };
 }
 
-watch(highlightedZone, (x) => console.log(x));
+function cancelHandler() {
+  userImage.value = undefined;
+  aspectRatio.value = undefined;
+  naturalSize.value = undefined;
+}
 </script>
 
 <template>
   <div class="crop">
     <div class="crop__window" draggable="false">
-      <div v-if="false" class="crop__preview" draggable="false">
+      <div v-if="userImage" class="crop__preview" draggable="false">
         <CropLayout :naturalSize v-model="highlightedZone" class="crop__layout">
           <img
-            class="crop__img"
+            :src="imageUrl"
             draggable="false"
-            src="https://img.freepik.com/premium-vector/beautiful-landscape-nature-background-images-free-download-freepik-vector_1305309-1538.jpg"
+            class="crop__img"
             @load="setLayoutAspectRatio"
           />
         </CropLayout>
       </div>
-      <DropZone></DropZone>
+      <DropZone v-else v-model="userImage" />
     </div>
     <div class="crop__buttons">
-      <button>Cancel</button>
+      <button @click="cancelHandler">Cancel</button>
       <button>Crop</button>
     </div>
   </div>
