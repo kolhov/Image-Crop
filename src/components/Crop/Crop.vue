@@ -26,6 +26,7 @@ function cancelHandler() {
   userImage.value = undefined;
   aspectRatio.value = undefined;
   naturalSize.value = undefined;
+  highlightedZone.value = undefined;
 }
 
 async function cropHandler() {
