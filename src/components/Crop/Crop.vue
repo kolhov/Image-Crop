@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import CropLayout from "./CropLayout.vue";
-import type { HighlightNormalizedBounds, ImageSize } from "@/lib/types";
-import DropZone from "../DropZone/DropZone.vue";
 import Button from "../Button/Button.vue";
+import DropZone from "../DropZone/DropZone.vue";
+import CropLayout from "./CropLayout.vue";
 import CancelIcon from "../Icons/CancelIcon.vue";
 import ScissorsIcon from "../Icons/ScissorsIcon.vue";
+import { computed, ref, watch } from "vue";
+import type { HighlightNormalizedBounds, ImageSize } from "@/lib/types";
 
 const userImage = ref<File>();
 const aspectRatio = ref<string | null>();
@@ -26,6 +26,7 @@ function cancelHandler() {
   userImage.value = undefined;
   aspectRatio.value = undefined;
   naturalSize.value = undefined;
+  highlightedZone.value = undefined;
 }
 
 async function cropHandler() {
@@ -54,19 +55,17 @@ async function cropHandler() {
 
   if (!blob) return;
 
-  downloadBlobAsImage(blob);
+  downloadBlobAsImage(blob, userImage.value?.name || 'img');
 
   image.remove();
   canvas.remove();
 }
 
-function downloadBlobAsImage(blob: Blob) {
-  if (!userImage.value) return;
-
+function downloadBlobAsImage(blob: Blob, name: string) {
   const a = document.createElement("a");
   const url = URL.createObjectURL(blob);
   a.href = url;
-  a.download = `${userImage.value?.name}-cropped.png`;
+  a.download = `${name}-cropped.png`;
   a.click();
 
   a.remove();
