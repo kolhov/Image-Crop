@@ -3,6 +3,9 @@ import { computed, ref, watch } from "vue";
 import CropLayout from "./CropLayout.vue";
 import type { HighlightNormalizedBounds, ImageSize } from "@/lib/types";
 import DropZone from "../DropZone/DropZone.vue";
+import Button from "../Button/Button.vue";
+import CancelIcon from "../Icons/CancelIcon.vue";
+import ScissorsIcon from "../Icons/ScissorsIcon.vue";
 
 const userImage = ref();
 const aspectRatio = ref<string | null>();
@@ -40,8 +43,14 @@ function cancelHandler() {
       <DropZone v-else v-model="userImage" />
     </div>
     <div class="crop__buttons">
-      <button @click="cancelHandler">Cancel</button>
-      <button>Crop</button>
+      <Button type="secondary" @click="cancelHandler" class="btn">
+        <CancelIcon class="btn__icon" />
+        Cancel
+      </Button>
+      <Button class="btn">
+        <ScissorsIcon class="btn__icon" />
+        Crop
+      </Button>
     </div>
   </div>
 </template>
@@ -99,6 +108,23 @@ function cancelHandler() {
     width: 100%;
 
     object-fit: contain;
+  }
+
+  &__buttons {
+    display: flex;
+    gap: 24px;
+  }
+}
+
+.btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+
+  &__icon {
+    height: 18px;
+    width: 18px;
   }
 }
 </style>

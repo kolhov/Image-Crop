@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import Upload from "../Icons/Upload.vue";
+import Upload from "../Icons/UploadIcon.vue";
 
 const isDragOver = ref(false);
 const img = defineModel();
