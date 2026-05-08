@@ -7,12 +7,14 @@ import Button from "../Button/Button.vue";
 import CancelIcon from "../Icons/CancelIcon.vue";
 import ScissorsIcon from "../Icons/ScissorsIcon.vue";
 
-const userImage = ref();
+const userImage = ref<File>();
 const aspectRatio = ref<string | null>();
 const naturalSize = ref<ImageSize>();
 const highlightedZone = ref<HighlightNormalizedBounds>();
 
-const imageUrl = computed(() => URL.createObjectURL(userImage.value));
+const imageUrl = computed(
+  () => userImage.value && URL.createObjectURL(userImage.value),
+);
 
 function setLayoutAspectRatio(e: Event) {
   const img = e.target as HTMLImageElement;
@@ -25,6 +27,57 @@ function cancelHandler() {
   aspectRatio.value = undefined;
   naturalSize.value = undefined;
 }
+
+async function cropHandler() {
+  if (!highlightedZone.value || !imageUrl.value) return;
+
+  const image = new Image();
+  image.src = imageUrl.value;
+  await image.decode();
+
+  const { top, bottom, left, right } = highlightedZone.value;
+  const width = right - left;
+  const height = bottom - top;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  ctx.drawImage(image, left, top, width, height, 0, 0, width, height);
+
+  const blob = await new Promise<Blob | null>((res) =>
+    canvas.toBlob(res, "image/png"),
+  );
+
+  if (!blob) return;
+
+  downloadBlobAsImage(blob);
+
+  image.remove();
+  canvas.remove();
+}
+
+function downloadBlobAsImage(blob: Blob) {
+  if (!userImage.value) return;
+
+  const a = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  a.download = `${userImage.value?.name}-cropped.png`;
+  a.click();
+
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+watch(imageUrl, (_, prev) => {
+  if (prev) {
+    URL.revokeObjectURL(prev)
+  }
+});
 </script>
 
 <template>
@@ -42,12 +95,12 @@ function cancelHandler() {
       </div>
       <DropZone v-else v-model="userImage" />
     </div>
-    <div class="crop__buttons">
+    <div v-if="userImage" class="crop__buttons">
       <Button type="secondary" @click="cancelHandler" class="btn">
         <CancelIcon class="btn__icon" />
         Cancel
       </Button>
-      <Button class="btn">
+      <Button @click="cropHandler" class="btn">
         <ScissorsIcon class="btn__icon" />
         Crop
       </Button>
