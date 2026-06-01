@@ -175,6 +175,8 @@ function stopEditingHighlight(e: MouseEvent) {
 
   window.removeEventListener("mousemove", onHoverEditing);
   window.removeEventListener("mouseup", stopEditingHighlight);
+  
+  calcCropArea();
 }
 //#endregion
 
@@ -193,9 +195,9 @@ function calcCropArea() {
   const { scrollHeight, scrollWidth } = layout.value;
 
   highlightedZone.value = {
-    top: Math.floor((top / scrollHeight) * naturalSize?.h),
+    top: Math.ceil((top / scrollHeight) * naturalSize?.h),
     bottom: Math.ceil((bottom / scrollHeight) * naturalSize?.h),
-    left: Math.floor((left / scrollWidth) * naturalSize?.w),
+    left: Math.ceil((left / scrollWidth) * naturalSize?.w),
     right: Math.ceil((right / scrollWidth) * naturalSize?.w),
   };
 }
