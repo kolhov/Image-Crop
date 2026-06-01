@@ -16,3 +16,10 @@ export interface ImageSize {
   h: number;
   w: number;
 }
+
+export enum CornerSideEnum {
+  TopLeft,
+  TopRight,
+  BottomRight,
+  BottomLeft,
+}

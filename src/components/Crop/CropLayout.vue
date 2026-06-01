@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type {
-  HighlightNormalizedBounds,
-  HighlightRawPoints,
-  ImageSize,
+import {
+  CornerSideEnum,
+  type HighlightNormalizedBounds,
+  type HighlightRawPoints,
+  type ImageSize,
 } from "@/lib/types";
 import { computed, ref } from "vue";
 import HandleIcon from "../Icons/HandleIcon.vue";
@@ -51,13 +52,13 @@ const normalizedHighlight = computed(() => {
     coords.right = right;
   }
 
-  const { scrollHeight, scrollWidth } = layout.value;
+  const { clientHeight, clientWidth } = layout.value;
 
   return {
     top: Math.max(coords.top, 0),
-    bottom: Math.min(coords.bottom, scrollHeight),
+    bottom: Math.min(coords.bottom, clientHeight),
     left: Math.max(coords.left, 0),
-    right: Math.min(coords.right, scrollWidth),
+    right: Math.min(coords.right, clientWidth),
   };
 });
 
@@ -125,13 +126,6 @@ function stopHighlightning(e: MouseEvent) {
 //#endregion
 
 //#region Corner events
-enum CornerSideEnum {
-  TopLeft,
-  TopRight,
-  BottomRight,
-  BottomLeft,
-}
-
 const selectedCorner = ref();
 
 function startEditingHighlight(e: MouseEvent, index: number) {
@@ -171,11 +165,10 @@ function onHoverEditing(e: MouseEvent) {
 }
 
 function stopEditingHighlight(e: MouseEvent) {
-  rawHighlight.value = normalizedHighlight.value
-
   window.removeEventListener("mousemove", onHoverEditing);
   window.removeEventListener("mouseup", stopEditingHighlight);
-  
+  rawHighlight.value = normalizedHighlight.value;
+
   calcCropArea();
 }
 //#endregion
@@ -192,24 +185,19 @@ function calcCropArea() {
   )
     return;
 
-  const { scrollHeight, scrollWidth } = layout.value;
+  const { clientHeight, clientWidth } = layout.value;
 
   highlightedZone.value = {
-    top: Math.ceil((top / scrollHeight) * naturalSize?.h),
-    bottom: Math.ceil((bottom / scrollHeight) * naturalSize?.h),
-    left: Math.ceil((left / scrollWidth) * naturalSize?.w),
-    right: Math.ceil((right / scrollWidth) * naturalSize?.w),
+    top: Math.ceil((top / clientHeight) * naturalSize?.h),
+    left: Math.ceil((left / clientWidth) * naturalSize?.w),
+    bottom: Math.ceil((bottom / clientHeight) * naturalSize?.h),
+    right: Math.ceil((right / clientWidth) * naturalSize?.w),
   };
 }
 </script>
 
 <template>
-  <div
-    ref="layout"
-    @mousedown="startHighlightning"
-    @mouseleave="stopHighlightning"
-    draggable="false"
-  >
+  <div ref="layout" @mousedown="startHighlightning" draggable="false">
     <div
       v-if="isHighlighted"
       class="crop__corner"
