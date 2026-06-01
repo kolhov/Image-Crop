@@ -1,8 +1,8 @@
 export interface HighlightRawPoints {
-  xStart?: number;
-  yStart?: number;
-  xEnd?: number;
-  yEnd?: number;
+  left?: number;
+  top?: number;
+  right?: number;
+  bottom?: number;
 }
 
 export interface HighlightNormalizedBounds {

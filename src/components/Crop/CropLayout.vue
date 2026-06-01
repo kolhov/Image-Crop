@@ -5,49 +5,54 @@ import type {
   ImageSize,
 } from "@/lib/types";
 import { computed, ref } from "vue";
+import HandleIcon from "../Icons/HandleIcon.vue";
 
 interface CropLayoutProps {
   naturalSize?: ImageSize;
 }
 
+const CORNER_SIZE_PX = 18;
+const CORNER_OFFSET_PX = 4;
+
 const { naturalSize } = defineProps<CropLayoutProps>();
 const highlightedZone = defineModel<HighlightNormalizedBounds>();
 
 const layout = ref<HTMLElement>();
+const layoutRect = computed(() => layout.value?.getBoundingClientRect());
+
 const rawHighlight = ref<HighlightRawPoints>({});
-const isHighlightningStarted = ref<boolean>(false);
 
 const normalizedHighlight = computed(() => {
   const coords = {} as HighlightNormalizedBounds;
-  const { xEnd, xStart, yEnd, yStart } = rawHighlight.value;
+  const { right, left, bottom, top } = rawHighlight.value;
 
   if (
     !layout.value ||
-    yStart == null ||
-    yEnd == null ||
-    xStart == null ||
-    xEnd == null
+    top == null ||
+    bottom == null ||
+    left == null ||
+    right == null
   )
     return coords;
 
-  if (yEnd < yStart) {
-    coords.top = yEnd;
-    coords.bottom = yStart;
+  if (bottom < top) {
+    coords.top = bottom;
+    coords.bottom = top;
   } else {
-    coords.top = yStart;
-    coords.bottom = yEnd;
+    coords.top = top;
+    coords.bottom = bottom;
   }
 
-  if (xEnd < xStart) {
-    coords.left = xEnd;
-    coords.right = xStart;
+  if (right < left) {
+    coords.left = right;
+    coords.right = left;
   } else {
-    coords.left = xStart;
-    coords.right = xEnd;
+    coords.left = left;
+    coords.right = right;
   }
 
   const { scrollHeight, scrollWidth } = layout.value;
-  
+
   return {
     top: Math.max(coords.top, 0),
     bottom: Math.min(coords.bottom, scrollHeight),
@@ -76,37 +81,102 @@ const highlightH = computed(() => {
 
 const isHighlighted = computed<boolean>(
   () =>
-    rawHighlight.value.xStart != null &&
+    rawHighlight.value.left != null &&
     highlightW.value > 4 &&
     highlightH.value > 4,
 );
 
-function startHighlightning(e: MouseEvent) {
-  rawHighlight.value.xStart = e.offsetX;
-  rawHighlight.value.yStart = e.offsetY;
+//#region Hightlight events
+const isHighlightningStarted = ref<boolean>(false);
 
-  rawHighlight.value.xEnd = undefined;
-  rawHighlight.value.yEnd = undefined;
+function startHighlightning(e: MouseEvent) {
+  rawHighlight.value.left = e.offsetX;
+  rawHighlight.value.top = e.offsetY;
+
+  rawHighlight.value.right = undefined;
+  rawHighlight.value.bottom = undefined;
 
   isHighlightningStarted.value = true;
+
+  window.addEventListener("mousemove", onHover);
+  window.addEventListener("mouseup", stopHighlightning);
 }
 
 function onHover(e: MouseEvent) {
-  if (!isHighlightningStarted.value) return;
+  if (!isHighlightningStarted.value || !layoutRect.value) return;
 
-  rawHighlight.value.xEnd = e.offsetX;
-  rawHighlight.value.yEnd = e.offsetY;
+  const rect = layoutRect.value;
+
+  rawHighlight.value.right = e.clientX - rect?.left;
+  rawHighlight.value.bottom = e.clientY - rect?.top;
 }
 
 function stopHighlightning(e: MouseEvent) {
   if (!isHighlightningStarted.value) return;
   isHighlightningStarted.value = false;
 
-  rawHighlight.value.xEnd = e.offsetX;
-  rawHighlight.value.yEnd = e.offsetY;
+  window.removeEventListener("mousemove", onHover);
+  window.removeEventListener("mouseup", stopHighlightning);
+
+  rawHighlight.value = normalizedHighlight.value;
 
   calcCropArea();
 }
+//#endregion
+
+//#region Corner events
+enum CornerSideEnum {
+  TopLeft,
+  TopRight,
+  BottomRight,
+  BottomLeft,
+}
+
+const selectedCorner = ref();
+
+function startEditingHighlight(e: MouseEvent, index: number) {
+  selectedCorner.value = index;
+
+  window.addEventListener("mousemove", onHoverEditing);
+  window.addEventListener("mouseup", stopEditingHighlight);
+}
+
+function onHoverEditing(e: MouseEvent) {
+  if (selectedCorner.value == null || !layoutRect.value) return;
+
+  const rect = layoutRect.value;
+
+  switch (selectedCorner.value) {
+    case CornerSideEnum.TopLeft: {
+      rawHighlight.value.left = e.clientX - rect?.left;
+      rawHighlight.value.top = e.clientY - rect?.top;
+      break;
+    }
+    case CornerSideEnum.TopRight: {
+      rawHighlight.value.right = e.clientX - rect?.left;
+      rawHighlight.value.top = e.clientY - rect?.top;
+      break;
+    }
+    case CornerSideEnum.BottomRight: {
+      rawHighlight.value.right = e.clientX - rect?.left;
+      rawHighlight.value.bottom = e.clientY - rect?.top;
+      break;
+    }
+    case CornerSideEnum.BottomLeft: {
+      rawHighlight.value.left = e.clientX - rect?.left;
+      rawHighlight.value.bottom = e.clientY - rect?.top;
+      break;
+    }
+  }
+}
+
+function stopEditingHighlight(e: MouseEvent) {
+  rawHighlight.value = normalizedHighlight.value
+
+  window.removeEventListener("mousemove", onHoverEditing);
+  window.removeEventListener("mouseup", stopEditingHighlight);
+}
+//#endregion
 
 function calcCropArea() {
   const { top, bottom, left, right } = normalizedHighlight.value;
@@ -135,11 +205,56 @@ function calcCropArea() {
   <div
     ref="layout"
     @mousedown="startHighlightning"
-    @mouseup="stopHighlightning"
     @mouseleave="stopHighlightning"
-    @mousemove="onHover"
     draggable="false"
   >
+    <div
+      v-if="isHighlighted"
+      class="crop__corner"
+      :style="{
+        top: `${normalizedHighlight?.top - CORNER_OFFSET_PX}px`,
+        left: `${normalizedHighlight?.left - CORNER_OFFSET_PX}px`,
+        rotate: `180deg`,
+      }"
+      @mousedown.stop.prevent="(e) => startEditingHighlight(e, 0)"
+    >
+      <HandleIcon />
+    </div>
+    <div
+      v-if="isHighlighted"
+      class="crop__corner"
+      :style="{
+        top: `${normalizedHighlight?.top - CORNER_OFFSET_PX}px`,
+        left: `${normalizedHighlight?.right - CORNER_SIZE_PX + CORNER_OFFSET_PX}px`,
+        rotate: `270deg`,
+      }"
+      @mousedown.stop.prevent="(e) => startEditingHighlight(e, 1)"
+    >
+      <HandleIcon />
+    </div>
+    <div
+      v-if="isHighlighted"
+      class="crop__corner"
+      :style="{
+        top: `${normalizedHighlight?.bottom - CORNER_SIZE_PX + CORNER_OFFSET_PX}px`,
+        left: `${normalizedHighlight?.right - CORNER_SIZE_PX + CORNER_OFFSET_PX}px`,
+      }"
+      @mousedown.stop.prevent="(e) => startEditingHighlight(e, 2)"
+    >
+      <HandleIcon />
+    </div>
+    <div
+      v-if="isHighlighted"
+      class="crop__corner"
+      :style="{
+        top: `${normalizedHighlight?.bottom - CORNER_SIZE_PX + CORNER_OFFSET_PX}px`,
+        left: `${normalizedHighlight?.left - CORNER_OFFSET_PX}px`,
+        rotate: `90deg`,
+      }"
+      @mousedown.stop.prevent="(e) => startEditingHighlight(e, 3)"
+    >
+      <HandleIcon />
+    </div>
     <div
       v-if="isHighlighted"
       class="crop__highlight"
@@ -154,13 +269,33 @@ function calcCropArea() {
   </div>
 </template>
 
-<style>
-.crop__highlight {
-  position: absolute;
-  z-index: 9;
+<style lang="scss">
+.crop {
+  &__highlight {
+    position: absolute;
+    z-index: 9;
 
-  pointer-events: none;
-  border: 1px solid wheat;
-  box-shadow: 0 0 0 200vw rgba(1, 1, 1, 0.5);
+    pointer-events: none;
+    border: 1px solid wheat;
+    box-shadow: 0 0 0 200vw rgba(1, 1, 1, 0.5);
+  }
+
+  &__corner {
+    --size: v-bind(CORNER_SIZE_PX + "px");
+    position: absolute;
+    z-index: 10;
+    scale: 1.5;
+    cursor: pointer;
+
+    height: var(--size);
+    min-height: var(--size);
+    width: var(--size);
+    min-width: var(--size);
+    color: whitesmoke;
+
+    svg:hover {
+      color: yellowgreen;
+    }
+  }
 }
 </style>
