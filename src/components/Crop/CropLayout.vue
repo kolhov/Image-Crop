@@ -19,10 +19,10 @@ const { naturalSize } = defineProps<CropLayoutProps>();
 const highlightedZone = defineModel<HighlightNormalizedBounds>();
 
 const layout = ref<HTMLElement>();
-const layoutRect = computed(() => layout.value?.getBoundingClientRect());
-
 const rawHighlight = ref<HighlightRawPoints>({});
 
+//#region computed
+const layoutRect = computed(() => layout.value?.getBoundingClientRect());
 const normalizedHighlight = computed(() => {
   const coords = {} as HighlightNormalizedBounds;
   const { right, left, bottom, top } = rawHighlight.value;
@@ -86,11 +86,12 @@ const isHighlighted = computed<boolean>(
     highlightW.value > 4 &&
     highlightH.value > 4,
 );
+//#endregion
 
 //#region Hightlight events
 const isHighlightningStarted = ref<boolean>(false);
 
-function startHighlightning(e: MouseEvent) {
+function startHighlightning(e: PointerEvent) {
   rawHighlight.value.left = e.offsetX;
   rawHighlight.value.top = e.offsetY;
 
@@ -99,11 +100,15 @@ function startHighlightning(e: MouseEvent) {
 
   isHighlightningStarted.value = true;
 
-  window.addEventListener("mousemove", onHover);
-  window.addEventListener("mouseup", stopHighlightning);
+  const target = e.currentTarget as HTMLElement;
+  target.setPointerCapture(e.pointerId);
+
+  window.addEventListener("pointermove", onHover);
+  window.addEventListener("pointerup", stopHighlightning);
+  window.addEventListener("pointercancel", stopHighlightning);
 }
 
-function onHover(e: MouseEvent) {
+function onHover(e: PointerEvent) {
   if (!isHighlightningStarted.value || !layoutRect.value) return;
 
   const rect = layoutRect.value;
@@ -112,12 +117,13 @@ function onHover(e: MouseEvent) {
   rawHighlight.value.bottom = e.clientY - rect?.top;
 }
 
-function stopHighlightning(e: MouseEvent) {
+function stopHighlightning(e: PointerEvent) {
   if (!isHighlightningStarted.value) return;
   isHighlightningStarted.value = false;
 
-  window.removeEventListener("mousemove", onHover);
-  window.removeEventListener("mouseup", stopHighlightning);
+  window.removeEventListener("pointermove", onHover);
+  window.removeEventListener("pointerup", stopHighlightning);
+  window.removeEventListener("pointercancel", stopHighlightning);
 
   rawHighlight.value = normalizedHighlight.value;
 
@@ -128,14 +134,18 @@ function stopHighlightning(e: MouseEvent) {
 //#region Corner events
 const selectedCorner = ref();
 
-function startEditingHighlight(e: MouseEvent, index: number) {
+function startEditingHighlight(e: PointerEvent, index: number) {
   selectedCorner.value = index;
 
-  window.addEventListener("mousemove", onHoverEditing);
-  window.addEventListener("mouseup", stopEditingHighlight);
+  const target = e.currentTarget as HTMLElement;
+  target.setPointerCapture(e.pointerId);
+
+  window.addEventListener("pointermove", onHoverEditing);
+  window.addEventListener("pointerup", stopEditingHighlight);
+  window.addEventListener("pointercancel", stopEditingHighlight);
 }
 
-function onHoverEditing(e: MouseEvent) {
+function onHoverEditing(e: PointerEvent) {
   if (selectedCorner.value == null || !layoutRect.value) return;
 
   const rect = layoutRect.value;
@@ -164,9 +174,10 @@ function onHoverEditing(e: MouseEvent) {
   }
 }
 
-function stopEditingHighlight(e: MouseEvent) {
-  window.removeEventListener("mousemove", onHoverEditing);
-  window.removeEventListener("mouseup", stopEditingHighlight);
+function stopEditingHighlight(e: PointerEvent) {
+  window.removeEventListener("pointermove", onHoverEditing);
+  window.removeEventListener("pointerup", stopEditingHighlight);
+  window.removeEventListener("pointercancel", stopEditingHighlight);
   rawHighlight.value = normalizedHighlight.value;
 
   calcCropArea();
@@ -197,7 +208,12 @@ function calcCropArea() {
 </script>
 
 <template>
-  <div ref="layout" @mousedown="startHighlightning" draggable="false">
+  <div
+    ref="layout"
+    @pointerdown="startHighlightning"
+    draggable="false"
+    class="crop"
+  >
     <div
       v-if="isHighlighted"
       class="crop__corner"
@@ -206,7 +222,7 @@ function calcCropArea() {
         left: `${normalizedHighlight?.left - CORNER_OFFSET_PX}px`,
         rotate: `180deg`,
       }"
-      @mousedown.stop.prevent="(e) => startEditingHighlight(e, 0)"
+      @pointerdown.stop.prevent="(e) => startEditingHighlight(e, 0)"
     >
       <HandleIcon />
     </div>
@@ -218,7 +234,7 @@ function calcCropArea() {
         left: `${normalizedHighlight?.right - CORNER_SIZE_PX + CORNER_OFFSET_PX}px`,
         rotate: `270deg`,
       }"
-      @mousedown.stop.prevent="(e) => startEditingHighlight(e, 1)"
+      @pointerdown.stop.prevent="(e) => startEditingHighlight(e, 1)"
     >
       <HandleIcon />
     </div>
@@ -229,7 +245,7 @@ function calcCropArea() {
         top: `${normalizedHighlight?.bottom - CORNER_SIZE_PX + CORNER_OFFSET_PX}px`,
         left: `${normalizedHighlight?.right - CORNER_SIZE_PX + CORNER_OFFSET_PX}px`,
       }"
-      @mousedown.stop.prevent="(e) => startEditingHighlight(e, 2)"
+      @pointerdown.stop.prevent="(e) => startEditingHighlight(e, 2)"
     >
       <HandleIcon />
     </div>
@@ -241,7 +257,7 @@ function calcCropArea() {
         left: `${normalizedHighlight?.left - CORNER_OFFSET_PX}px`,
         rotate: `90deg`,
       }"
-      @mousedown.stop.prevent="(e) => startEditingHighlight(e, 3)"
+      @pointerdown.stop.prevent="(e) => startEditingHighlight(e, 3)"
     >
       <HandleIcon />
     </div>
@@ -261,11 +277,14 @@ function calcCropArea() {
 
 <style lang="scss">
 .crop {
+  touch-action: none;
+
   &__highlight {
     position: absolute;
     z-index: 9;
 
     pointer-events: none;
+    touch-action: none;
     border: 1px solid wheat;
     box-shadow: 0 0 0 200vw rgba(1, 1, 1, 0.5);
   }
@@ -276,6 +295,7 @@ function calcCropArea() {
     z-index: 10;
     scale: 1.5;
     cursor: pointer;
+    touch-action: none;
 
     height: var(--size);
     min-height: var(--size);
