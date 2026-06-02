@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import {
-  CornerSideEnum,
-  type HighlightNormalizedBounds,
-  type HighlightRawPoints,
-  type ImageSize,
+import { CornerSideEnum } from "@/lib/types";
+import { computed, ref, watch } from "vue";
+import type {
+  HighlightNormalizedBounds,
+  HighlightRawPoints,
+  ImageSize,
 } from "@/lib/types";
-import { computed, ref } from "vue";
 import HandleIcon from "../Icons/HandleIcon.vue";
 import MoveIcon from "../Icons/MoveIcon.vue";
 
 interface CropLayoutProps {
   naturalSize?: ImageSize;
 }
-
-const CORNER_SIZE_PX = 18;
-const CORNER_OFFSET_PX = 4;
 
 const { naturalSize } = defineProps<CropLayoutProps>();
 const highlightedZone = defineModel<HighlightNormalizedBounds>();
@@ -131,7 +128,9 @@ function stopHighlightning(e: PointerEvent) {
 }
 //#endregion
 
-//#region Corner events
+//#region Corners
+const CORNER_SIZE_PX = 18;
+const CORNER_OFFSET_PX = 4;
 const selectedCorner = ref();
 
 function startEditingHighlight(e: PointerEvent, index: number) {
@@ -228,9 +227,10 @@ function calcCropArea() {
     bottom == null ||
     left == null ||
     right == null ||
-    !naturalSize
+    !naturalSize ||
+    !isHighlighted.value
   )
-    return;
+    return highlightedZone.value = undefined;
 
   const { clientHeight, clientWidth } = layout.value;
 

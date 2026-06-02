@@ -6,6 +6,7 @@ import CancelIcon from "../Icons/CancelIcon.vue";
 import ScissorsIcon from "../Icons/ScissorsIcon.vue";
 import { computed, ref, watch } from "vue";
 import type { HighlightNormalizedBounds, ImageSize } from "@/lib/types";
+import { downloadBlobAsImage } from "@/lib/utils.ts";
 
 const userImage = ref<File>();
 const aspectRatio = ref<string | null>();
@@ -22,6 +23,9 @@ function setLayoutAspectRatio(e: Event) {
   naturalSize.value = { h: img.naturalHeight, w: img.naturalWidth };
 }
 
+//#region Buttons
+const isLoading = ref(false);
+
 function cancelHandler() {
   userImage.value = undefined;
   aspectRatio.value = undefined;
@@ -31,6 +35,7 @@ function cancelHandler() {
 
 async function cropHandler() {
   if (!highlightedZone.value || !imageUrl.value) return;
+  isLoading.value = true;
 
   const image = new Image();
   image.src = imageUrl.value;
@@ -45,7 +50,7 @@ async function cropHandler() {
   canvas.height = height;
 
   const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) return isLoading.value = false;
 
   ctx.drawImage(image, left, top, width, height, 0, 0, width, height);
 
@@ -53,28 +58,23 @@ async function cropHandler() {
     canvas.toBlob(res, "image/png"),
   );
 
-  if (!blob) return;
+  if (!blob) return isLoading.value = false;
 
-  downloadBlobAsImage(blob, userImage.value?.name || 'img');
+  downloadBlobAsImage(
+    blob,
+    `${userImage.value?.name}-cropped.png` || "cropped-img.png",
+  );
 
   image.remove();
   canvas.remove();
+  isLoading.value = false;
 }
+//#endregion
 
-function downloadBlobAsImage(blob: Blob, name: string) {
-  const a = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  a.href = url;
-  a.download = `${name}-cropped.png`;
-  a.click();
-
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
+// Preventing memory leak
 watch(imageUrl, (_, prev) => {
   if (prev) {
-    URL.revokeObjectURL(prev)
+    URL.revokeObjectURL(prev);
   }
 });
 </script>
@@ -95,13 +95,22 @@ watch(imageUrl, (_, prev) => {
       <DropZone v-else v-model="userImage" />
     </div>
     <div v-if="userImage" class="crop__buttons">
-      <Button type="secondary" @click="cancelHandler" class="btn">
+      <Button
+        type="secondary"
+        @click="cancelHandler"
+        class="btn"
+        :disabled="isLoading"
+      >
         <CancelIcon class="btn__icon" />
         Cancel
       </Button>
-      <Button @click="cropHandler" class="btn">
-        <ScissorsIcon class="btn__icon" />
-        Crop
+      <Button @click="cropHandler" :disabled="isLoading || !highlightedZone?.top">
+        <span v-if="!isLoading" class="btn">
+          <ScissorsIcon class="btn__icon" />
+          Crop
+        </span>
+        <div v-else class="spinner">
+        </div>
       </Button>
     </div>
   </div>
@@ -177,6 +186,22 @@ watch(imageUrl, (_, prev) => {
   &__icon {
     height: 18px;
     width: 18px;
+  }
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  padding: 1px;
+  border: 2px solid #ddd;
+  border-top-color: #1c008a;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>

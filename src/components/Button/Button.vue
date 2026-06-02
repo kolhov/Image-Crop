@@ -26,6 +26,10 @@ const { type = "primary" } = defineProps<ButtonProps>();
   &:hover {
     opacity: 1;
   }
+
+  &:disabled {
+    opacity: 0.2;
+  }
   
   &--primary {
     opacity: 0.9;
