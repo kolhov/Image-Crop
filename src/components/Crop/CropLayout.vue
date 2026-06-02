@@ -7,6 +7,7 @@ import {
 } from "@/lib/types";
 import { computed, ref } from "vue";
 import HandleIcon from "../Icons/HandleIcon.vue";
+import MoveIcon from "../Icons/MoveIcon.vue";
 
 interface CropLayoutProps {
   naturalSize?: ImageSize;
@@ -118,7 +119,6 @@ function onHover(e: PointerEvent) {
 }
 
 function stopHighlightning(e: PointerEvent) {
-  if (!isHighlightningStarted.value) return;
   isHighlightningStarted.value = false;
 
   window.removeEventListener("pointermove", onHover);
@@ -179,6 +179,42 @@ function stopEditingHighlight(e: PointerEvent) {
   window.removeEventListener("pointerup", stopEditingHighlight);
   window.removeEventListener("pointercancel", stopEditingHighlight);
   rawHighlight.value = normalizedHighlight.value;
+
+  calcCropArea();
+}
+//#endregion
+
+//#region Move zone events
+let startCoord = { x: 0, y: 0 };
+
+function startZoneMove(e: PointerEvent) {
+  const target = e.currentTarget as HTMLElement;
+  target.setPointerCapture(e.pointerId);
+
+  startCoord = { x: e.clientX, y: e.clientY };
+
+  window.addEventListener("pointermove", onHoverZoneMove);
+  window.addEventListener("pointerup", stopZoneMove);
+  window.addEventListener("pointercancel", stopZoneMove);
+}
+
+function onHoverZoneMove(e: PointerEvent) {
+  const { left, top, bottom, right } = rawHighlight.value;
+  if (left == null || top == null || bottom == null || right == null) return;
+
+  const delta = { dx: startCoord.x - e.clientX, dy: startCoord.y - e.clientY };
+  rawHighlight.value.top = top - delta.dy;
+  rawHighlight.value.left = left - delta.dx;
+  rawHighlight.value.bottom = bottom - delta.dy;
+  rawHighlight.value.right = right - delta.dx;
+
+  startCoord = { x: e.clientX, y: e.clientY };
+}
+
+function stopZoneMove(e: PointerEvent) {
+  window.removeEventListener("pointermove", onHoverZoneMove);
+  window.removeEventListener("pointerup", stopZoneMove);
+  window.removeEventListener("pointercancel", stopZoneMove);
 
   calcCropArea();
 }
@@ -270,7 +306,10 @@ function calcCropArea() {
         top: `${normalizedHighlight?.top}px`,
         left: `${normalizedHighlight?.left}px`,
       }"
-    ></div>
+      @pointerdown.stop="startZoneMove"
+    >
+      <MoveIcon />
+    </div>
     <slot></slot>
   </div>
 </template>
@@ -283,10 +322,25 @@ function calcCropArea() {
     position: absolute;
     z-index: 9;
 
-    pointer-events: none;
     touch-action: none;
     border: 1px solid wheat;
     box-shadow: 0 0 0 200vw rgba(1, 1, 1, 0.5);
+
+    svg {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: whitesmoke;
+      scale: 1.5;
+      opacity: 0.6;
+      cursor: pointer;
+
+      &:hover {
+        color: yellowgreen;
+        opacity: 0.8;
+      }
+    }
   }
 
   &__corner {
